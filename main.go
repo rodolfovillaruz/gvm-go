@@ -152,8 +152,6 @@ func main() {
 	case "start":
 		// Require GVM_USER up front so we don't wait for a start just to
 		// discover we can't complete the SSH step.
-		user := requireGVMUser()
-
 		if status == "RUNNING" {
 			fmt.Fprintf(os.Stderr, "Instance `%s` is already RUNNING.\n", instanceName)
 		} else {
@@ -177,7 +175,7 @@ func main() {
 			}
 		}
 
-		readyIP, err := waitForSSH(
+		_, err := waitForSSH(
 			ctx, svc, projectID, zone, instanceName,
 			time.Duration(timeoutSecs)*time.Second,
 		)
@@ -185,17 +183,6 @@ func main() {
 			fmt.Fprintf(os.Stderr, "Error waiting for SSH: %v\n", err)
 			os.Exit(1)
 		}
-
-		fmt.Fprintf(os.Stderr,
-			"\x1b[32mConnecting\x1b[0m to %s@%s (instance `%s` in zone %s)\n",
-			user, readyIP, instanceName, zone)
-
-		sshArgs := []string{
-			"-o", "StrictHostKeyChecking=no",
-			"-o", "UserKnownHostsFile=/dev/null",
-			user + "@" + readyIP,
-		}
-		runSSH(append(sshArgs, rest...))
 
 	// ── unknown ───────────────────────────────────────────────────────────────
 	default:

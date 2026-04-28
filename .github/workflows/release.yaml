@@ -1,0 +1,102 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+
+# Needed to create the GitHub release and upload assets.
+permissions:
+  contents: write
+
+jobs:
+  # ── build binaries ───────────────────────────────────────────────────────────
+  build:
+    name: Build (${{ matrix.goos }}/${{ matrix.goarch }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - goos: linux
+            goarch: amd64
+            artifact: gvm-linux-amd64
+
+          - goos: linux
+            goarch: arm64
+            artifact: gvm-linux-arm64
+
+          - goos: darwin
+            goarch: amd64
+            artifact: gvm-darwin-amd64
+
+          - goos: darwin
+            goarch: arm64
+            artifact: gvm-darwin-arm64
+
+          - goos: windows
+            goarch: amd64
+            artifact: gvm-windows-amd64.exe
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Build
+        env:
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+          CGO_ENABLED: "0"
+        # -trimpath  — strip local build paths from the binary for reproducibility.
+        # -s -w      — omit the symbol table and DWARF info to reduce binary size.
+        # -X ...     — not needed; buildVersion() reads debug.ReadBuildInfo() at
+        #              runtime, which is stamped automatically by `go install`.
+        run: |
+          go build \
+            -trimpath \
+            -ldflags="-s -w" \
+            -o "${{ matrix.artifact }}" \
+            .
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact }}
+          path: ${{ matrix.artifact }}
+          # Only needed long enough for the release job below to download them.
+          retention-days: 1
+
+  # ── create GitHub release ────────────────────────────────────────────────────
+  release:
+    name: Create Release
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        # Needed so softprops/action-gh-release can read the tag annotation.
+        with:
+          fetch-depth: 0
+
+      - name: Download all build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          # Flatten all per-binary artifact directories into a single dist/ folder.
+          merge-multiple: true
+          path: dist/
+
+      - name: List dist/
+        run: ls -lh dist/
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          # Attach every file in dist/ as a release asset.
+          files: dist/*
+          # Auto-generate release notes from merged PRs / commits since the
+          # previous tag.  Can be overridden by writing a tag annotation.
+          generate_release_notes: true

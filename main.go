@@ -9,6 +9,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"runtime/debug"
 	"strconv"
 	"strings"
 	"time"
@@ -29,14 +30,20 @@ func main() {
 	}
 
 	if len(args) < 2 {
-		fmt.Fprintf(os.Stderr, "Usage: %s <start|status|ssh|tmux> [args...]\n", program)
+		fmt.Fprintf(os.Stderr, "Usage: %s <start|status|version|ssh|tmux> [args...]\n", program)
 		os.Exit(1)
 	}
 
 	subcommand := args[1]
 	rest := args[2:]
 
-	// GVM_INSTANCE is required for every subcommand.
+	// version does not need any environment variables or credentials.
+	if subcommand == "version" {
+		fmt.Println(buildVersion())
+		os.Exit(0)
+	}
+
+	// GVM_INSTANCE is required for every remaining subcommand.
 	instanceName := mustEnv("GVM_INSTANCE",
 		"\x1b[31mError:\x1b[0m GVM_INSTANCE environment variable is not set.")
 
@@ -102,7 +109,12 @@ func main() {
 			"\x1b[32mConnecting\x1b[0m to %s@%s (instance `%s` in zone %s)\n",
 			user, ip, instanceName, zone)
 
-		runSSH(append([]string{user + "@" + ip}, rest...))
+		sshArgs := []string{
+			"-o", "StrictHostKeyChecking=no",
+			"-o", "UserKnownHostsFile=/dev/null",
+			user + "@" + ip,
+		}
+		runSSH(append(sshArgs, rest...))
 
 	// ── tmux ──────────────────────────────────────────────────────────────────
 	case "tmux":
@@ -178,18 +190,34 @@ func main() {
 			"\x1b[32mConnecting\x1b[0m to %s@%s (instance `%s` in zone %s)\n",
 			user, readyIP, instanceName, zone)
 
-		runSSH(append([]string{user + "@" + readyIP}, rest...))
+		sshArgs := []string{
+			"-o", "StrictHostKeyChecking=no",
+			"-o", "UserKnownHostsFile=/dev/null",
+			user + "@" + readyIP,
+		}
+		runSSH(append(sshArgs, rest...))
 
 	// ── unknown ───────────────────────────────────────────────────────────────
 	default:
 		fmt.Fprintf(os.Stderr,
-			"Unknown subcommand `%s`. Usage: %s <start|status|ssh|tmux> [args...]\n",
+			"Unknown subcommand `%s`. Usage: %s <start|status|version|ssh|tmux> [args...]\n",
 			subcommand, program)
 		os.Exit(1)
 	}
 }
 
 // ─── helpers ─────────────────────────────────────────────────────────────────
+
+// buildVersion returns the module version stamped by `go install` / `go build`,
+// or "dev" when running from source without a version tag.
+func buildVersion() string {
+	if info, ok := debug.ReadBuildInfo(); ok &&
+		info.Main.Version != "" &&
+		info.Main.Version != "(devel)" {
+		return info.Main.Version
+	}
+	return "dev"
+}
 
 // mustEnv returns the value of the named environment variable, or prints msg
 // and exits if it is unset/empty.

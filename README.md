@@ -17,6 +17,7 @@ a single command.
 - [Authentication](#authentication)
 - [Configuration](#configuration)
 - [Usage](#usage)
+  - [version](#version)
   - [status](#status)
   - [start](#start)
   - [ssh](#ssh)
@@ -58,7 +59,7 @@ export PATH="$PATH:$(go env GOPATH)/bin"
 Verify the installation:
 
 ```bash
-gvm-go --help   # or just run: gvm-go
+gvm-go version
 ```
 
 You can rename the binary to `gvm` for convenience:
@@ -163,8 +164,18 @@ export GVM_USER="alice"
 ## Usage
 
 ```
-gvm <start|status|ssh|tmux> [args...]
+gvm <start|status|version|ssh|tmux> [args...]
 ```
+
+### version
+
+Print the installed version of `gvm`.
+
+```bash
+gvm version
+```
+
+No environment variables or credentials are required for this subcommand.
 
 ### status
 
@@ -195,6 +206,10 @@ GVM_START_TIMEOUT=300 gvm start
 
 Open an SSH session to a **running** instance. Extra arguments are forwarded
 directly to the underlying `ssh` call.
+
+Host-key checking is disabled automatically (`StrictHostKeyChecking=no`,
+`UserKnownHostsFile=/dev/null`) so that recycled or re-imaged VMs never
+trigger a key-mismatch error.
 
 ```bash
 gvm ssh
@@ -231,6 +246,9 @@ gvm tmux dev
 ## Examples
 
 ```bash
+# Print the installed version
+gvm version
+
 # Check if your dev VM is running
 gvm status
 

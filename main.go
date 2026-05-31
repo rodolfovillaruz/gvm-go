@@ -146,7 +146,11 @@ func main() {
 			user, ip, instanceName, zone, sessionName)
 
 		// -t allocates a pseudo-TTY, which tmux requires.
-		runSSH([]string{"-t", user + "@" + ip, "tmux new -As " + sessionName})
+		runSSH([]string{
+			"-o", "StrictHostKeyChecking=no",
+			"-o", "UserKnownHostsFile=/dev/null",
+			"-t", user + "@" + ip, "tmux new -As " + sessionName,
+		})
 
 	// ── start ─────────────────────────────────────────────────────────────────
 	case "start":
